@@ -1,10 +1,173 @@
+/**
+ * ANTIVÍRUS JS COMPLETO - 100% Node.js
+ * Um único arquivo, com tudo incluso
+ */
+
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const readline = require('readline');
 
-const folderPath = path.join(__dirname, 'data');
+//////////////////// CONFIG ////////////////////
+const SCAN_PATH = './scan';
+const QUARANTINE = './quarantine';
+const LOG_DIR = './logs';
 
-const malwareSignatures = [
-    'eval(',
-    'require("child_process")',
-    'malicious_code_3'
+[SCAN_PATH, QUARANTINE, LOG_DIR].forEach(d =>
+  fs.mkdirSync(d, { recursive: true })
+);
+
+const LOG_FILE = path.join(LOG_DIR, log-${Date.now()}.json);
+
+const signatures = [
+  "eval(",
+  "child_process",
+  "new Function(",
+  "while(true)",
+  "process.exit(",
+  "document.cookie"
 ];
+
+const hashDB = [
+  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+];
+
+//////////////////// LOG ////////////////////
+function log(type, file, extra = null) {
+  const entry = {
+    time: new Date().toISOString(),
+    type,
+    file,
+    extra
+  };
+  fs.appendFileSync(LOG_FILE, JSON.stringify(entry) + '\n');
+  console.log([${type}] ${file}, extra ? extra : '');
+}
+
+//////////////////// HASH ////////////////////
+function sha256(file) {
+  return crypto
+    .createHash('sha256')
+    .update(fs.readFileSync(file))
+    .digest('hex');
+}
+
+//////////////////// QUARENTENA ////////////////////
+function quarantine(file) {
+  const dest = path.join(QUARANTINE, path.basename(file));
+  fs.renameSync(file, dest);
+  log('QUARANTINE', dest);
+}
+
+function restore(fileName) {
+  const src = path.join(QUARANTINE, fileName);
+  const dest = path.join(SCAN_PATH, fileName);
+  if (!fs.existsSync(src)) {
+    console.log('❌ Arquivo não encontrado na quarentena');
+    return;
+  }
+  fs.renameSync(src, dest);
+  log('RESTORE', dest);
+}
+
+function listQuarantine() {
+  return fs.readdirSync(QUARANTINE);
+}
+
+//////////////////// HEURÍSTICA ////////////////////
+function heuristic(content) {
+  let score = 0;
+  if (content.includes('eval(')) score += 3;
+  if (content.includes('child_process')) score += 4;
+  if (content.includes('while(true)')) score += 2;
+  if (content.includes('process.exit')) score += 1;
+  return score;
+}
+
+//////////////////// SCANNER ////////////////////
+function scanFile(file) {
+  try {
+    const ext = path.extname(file);
+    if (!['.js', '.txt', '.html', '.json'].includes(ext)) return;
+
+    const hash = sha256(file);
+    if (hashDB.includes(hash)) {
+      log('MALWARE_HASH', file);
+      quarantine(file);
+      return;
+    }
+
+    const content = fs.readFileSync(file, 'utf8');
+    const sigs = signatures.filter(s => content.includes(s));
+    const risk = heuristic(content);
+
+    if (sigs.length > 0 || risk >= 5) {
+      log('MALWARE', file, { signatures: sigs, risk });
+      quarantine(file);
+      return;
+    }
+
+    log('CLEAN', file, { risk });
+  } catch (e) {
+    log('ERROR', file, { message: e.message });
+  }
+}
+
+function scanDir(dir) {
+  fs.readdirSync(dir).forEach(item => {
+    const full = path.join(dir, item);
+    const stat = fs.statSync(full);
+    if (stat.isDirectory()) scanDir(full);
+    else scanFile(full);
+  });
+}
+
+//////////////////// MONITORAMENTO ////////////////////
+function monitor() {
+  log('INFO', 'Monitoramento em tempo real iniciado');
+  fs.watch(SCAN_PATH, { recursive: true }, (_, file) => {
+    if (!file) return;
+    const full = path.join(SCAN_PATH, file);
+    if (fs.existsSync(full)) {
+      scanFile(full);
+    }
+  });
+}
+
+//////////////////// CLI ////////////////////
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+function menu() {
+  console.log(`
+🛡 ANTIVÍRUS JS
+1) Scan completo
+2) Monitoramento em tempo real
+3) Listar quarentena
+4) Restaurar arquivo
+5) Sair
+`);
+  rl.question('Escolha: ', op => {
+    if (op === '1') {
+      scanDir(SCAN_PATH);
+      menu();
+    } else if (op === '2') {
+      monitor();
+    } else if (op === '3') {
+      const files = listQuarantine();
+      console.log(files.length ? files : 'Quarentena vazia');
+      menu();
+    } else if (op === '4') {
+      rl.question('Nome do arquivo: ', name => {
+        restore(name);
+        menu();
+      });
+    } else {
+      rl.close();
+    }
+  });
+}
+
+menu();
