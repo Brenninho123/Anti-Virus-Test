@@ -3,14 +3,12 @@ const path = require('path');
 const crypto = require('crypto');
 const readline = require('readline');
 
-//////////////////// CONFIG ////////////////////
 const SCAN_PATH = './scan';
 const QUARANTINE = './quarantine';
 const LOG_DIR = './logs';
 
 [SCAN_PATH, QUARANTINE, LOG_DIR].forEach(d => fs.mkdirSync(d, { recursive: true }));
 
-// Usar concatenação para pkg
 const LOG_FILE = path.join(LOG_DIR, 'log-' + Date.now() + '.json');
 
 const signatures = [
@@ -26,19 +24,16 @@ const hashDB = [
   "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 ];
 
-//////////////////// LOG ////////////////////
 function log(type, file, extra) {
   const entry = { time: new Date().toISOString(), type, file, extra };
   fs.appendFileSync(LOG_FILE, JSON.stringify(entry) + '\n');
   console.log('[' + type + '] ' + file, extra ? extra : '');
 }
 
-//////////////////// HASH ////////////////////
 function sha256(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
-//////////////////// QUARENTENA ////////////////////
 function quarantine(file) {
   const dest = path.join(QUARANTINE, path.basename(file));
   fs.renameSync(file, dest);
@@ -60,7 +55,6 @@ function listQuarantine() {
   return fs.readdirSync(QUARANTINE);
 }
 
-//////////////////// HEURÍSTICA ////////////////////
 function heuristic(content) {
   let score = 0;
   if (content.includes('eval(')) score += 3;
@@ -70,29 +64,24 @@ function heuristic(content) {
   return score;
 }
 
-//////////////////// SCANNER ////////////////////
 function scanFile(file) {
   try {
     const ext = path.extname(file);
     if (!['.js', '.txt', '.html', '.json'].includes(ext)) return;
-
     const hash = sha256(file);
     if (hashDB.includes(hash)) {
       log('MALWARE_HASH', file);
       quarantine(file);
       return;
     }
-
     const content = fs.readFileSync(file, 'utf8');
     const sigs = signatures.filter(s => content.includes(s));
     const risk = heuristic(content);
-
     if (sigs.length > 0 || risk >= 5) {
       log('MALWARE', file, { signatures: sigs, risk });
       quarantine(file);
       return;
     }
-
     log('CLEAN', file, { risk });
   } catch (e) {
     log('ERROR', file, { message: e.message });
@@ -108,7 +97,6 @@ function scanDir(dir) {
   });
 }
 
-//////////////////// MONITORAMENTO ////////////////////
 function monitor() {
   log('INFO', 'Monitoramento em tempo real iniciado');
   fs.watch(SCAN_PATH, { recursive: true }, (_, file) => {
@@ -118,7 +106,6 @@ function monitor() {
   });
 }
 
-//////////////////// CLI ////////////////////
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
 function menu() {
@@ -131,23 +118,11 @@ function menu() {
 5) Sair
 `);
   rl.question('Escolha: ', op => {
-    if (op === '1') {
-      scanDir(SCAN_PATH);
-      menu();
-    } else if (op === '2') {
-      monitor();
-    } else if (op === '3') {
-      const files = listQuarantine();
-      console.log(files.length ? files : 'Quarentena vazia');
-      menu();
-    } else if (op === '4') {
-      rl.question('Nome do arquivo: ', name => {
-        restore(name);
-        menu();
-      });
-    } else {
-      rl.close();
-    }
+    if (op === '1') { scanDir(SCAN_PATH); menu(); }
+    else if (op === '2') { monitor(); }
+    else if (op === '3') { const files = listQuarantine(); console.log(files.length ? files : 'Quarentena vazia'); menu(); }
+    else if (op === '4') { rl.question('Nome do arquivo: ', name => { restore(name); menu(); }); }
+    else { rl.close(); }
   });
 }
 
