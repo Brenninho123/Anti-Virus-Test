@@ -9,7 +9,8 @@
   "build": {
     "productName": "antivirus",
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "icon.ico"
     }
   }
 }
