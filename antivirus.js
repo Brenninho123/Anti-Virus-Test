@@ -1,8 +1,3 @@
-/**
- * ANTIVÍRUS JS COMPLETO - 100% Node.js
- * Um único arquivo, com tudo incluso
- */
-
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -13,11 +8,10 @@ const SCAN_PATH = './scan';
 const QUARANTINE = './quarantine';
 const LOG_DIR = './logs';
 
-[SCAN_PATH, QUARANTINE, LOG_DIR].forEach(d =>
-  fs.mkdirSync(d, { recursive: true })
-);
+[SCAN_PATH, QUARANTINE, LOG_DIR].forEach(d => fs.mkdirSync(d, { recursive: true }));
 
-const LOG_FILE = path.join(LOG_DIR, log-${Date.now()}.json);
+// Usar concatenação para pkg
+const LOG_FILE = path.join(LOG_DIR, 'log-' + Date.now() + '.json');
 
 const signatures = [
   "eval(",
@@ -33,23 +27,15 @@ const hashDB = [
 ];
 
 //////////////////// LOG ////////////////////
-function log(type, file, extra = null) {
-  const entry = {
-    time: new Date().toISOString(),
-    type,
-    file,
-    extra
-  };
+function log(type, file, extra) {
+  const entry = { time: new Date().toISOString(), type, file, extra };
   fs.appendFileSync(LOG_FILE, JSON.stringify(entry) + '\n');
-  console.log([${type}] ${file}, extra ? extra : '');
+  console.log('[' + type + '] ' + file, extra ? extra : '');
 }
 
 //////////////////// HASH ////////////////////
 function sha256(file) {
-  return crypto
-    .createHash('sha256')
-    .update(fs.readFileSync(file))
-    .digest('hex');
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
 //////////////////// QUARENTENA ////////////////////
@@ -128,17 +114,12 @@ function monitor() {
   fs.watch(SCAN_PATH, { recursive: true }, (_, file) => {
     if (!file) return;
     const full = path.join(SCAN_PATH, file);
-    if (fs.existsSync(full)) {
-      scanFile(full);
-    }
+    if (fs.existsSync(full)) scanFile(full);
   });
 }
 
 //////////////////// CLI ////////////////////
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
 function menu() {
   console.log(`
